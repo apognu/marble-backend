@@ -1,5 +1,7 @@
 module github.com/checkmarble/marble-backend
 
+// Bust
+
 go 1.26.0
 
 require (

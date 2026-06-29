@@ -65,3 +65,4 @@ __debug_bin*
 .worktrees
 
 prompts
+node_modules
