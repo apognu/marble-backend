@@ -1,0 +1,19 @@
+name: PR build
+
+on: pull_request
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yaml
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: write
+
+  test:
+    uses: ./.github/workflows/test.yaml
+    needs: build
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: write

@@ -1,0 +1,37 @@
+name: Build backend
+
+on: workflow_call
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache build artifacts
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: marble-${{ github.job }}-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            marble-${{ github.job }}-
+            marble-
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: ./go.mod
+          cache: false
+
+      - name: Install native dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y libgeos++-dev
+
+      - name: Build
+        run: go build -v .

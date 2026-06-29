@@ -1,40 +1,8 @@
 name: Build and test back-end repo
 
-on: [pull_request]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+on: workflow_call
 
 jobs:
-  check_go_mod:
-    name: Check go.mod is tidy
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: ./go.mod
-
-      - name: Check go.mod is tidy
-        run: go mod tidy -diff
-
-  compliance:
-    permissions:
-      contents: read
-      pull-requests: read
-      checks: write
-    uses: ./.github/workflows/compliance.yaml
-
   test_migration_ordering:
     name: Test migration ordering
     runs-on: ubuntu-latest
@@ -69,11 +37,20 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: ./go.mod
-          cache: true
-          cache-dependency-path: go.mod
+          cache: false
+
+      - uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: marble-${{ github.job }}-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            marble-${{ github.job }}-
+            marble-
 
       - name: Cache Go tools only
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/go/bin
           key: ${{ runner.os }}-go-bin-${{ hashFiles('**/go.mod') }}
@@ -110,12 +87,3 @@ jobs:
             echo "Check if your new migrations can run after main branch migrations."
             exit 1
           }
-
-  test_backend:
-    permissions:
-      contents: read
-      pull-requests: read
-      checks: write
-    uses: ./.github/workflows/backend_test_workflow.yaml
-    secrets:
-      LICENSE_KEY: ${{ secrets.LICENSE_KEY }}
