@@ -83,11 +83,10 @@ jobs:
         run: |
           gcloud run jobs deploy migrations \
             --quiet \
+            --image="$VERSION_IMAGE" \
             --region="europe-west1" \
             --execute-now \
-            --wait \
-            --container=migrations \
-            --image="$VERSION_IMAGE"
+            --wait
 
       - name: Deploy server
         run: |
