@@ -14,11 +14,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v6
+      - uses: ./.github/actions/setup-go
         with:
-          go-version-file: ./go.mod
+          cache-prefix: go-host
 
-      - run: go install github.com/google/go-licenses/v2@latest
+      - run: go install github.com/google/go-licenses/v2@v2.0.1
 
       # Ignored packages
       # github.com/checkmarble

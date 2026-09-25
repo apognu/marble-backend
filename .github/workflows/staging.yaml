@@ -17,16 +17,20 @@ jobs:
       checks: write
     uses: ./.github/workflows/test.yaml
 
+  image:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/image.yaml
+    secrets:
+      segment_write_key_opensource: ${{ secrets.SEGMENT_WRITE_KEY_OPENSOURCE }}
+
   deploy:
-    needs: test
+    needs: [test, image]
     uses: ./.github/workflows/deploy.yaml
     permissions:
-      contents: write
-      id-token: write
+      contents: read
       packages: write
-      attestations: write
+      id-token: write
     with:
       environment: staging
       version: latest
-    secrets:
-      segment_write_key_opensource: ${{ secrets.SEGMENT_WRITE_KEY_OPENSOURCE }}
