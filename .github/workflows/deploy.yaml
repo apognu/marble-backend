@@ -11,82 +11,37 @@ on:
         type: string
         description: "version to deploy"
         required: true
-    secrets:
-      segment_write_key_opensource:
-        description: write key for segment (open source deployment)
 
 permissions:
-  contents: write
-  id-token: write
-  packages: write
-  attestations: write
+  contents: read
 
 jobs:
-  docker:
-    name: Build container image
-    runs-on: ubuntu-latest
-    env:
-      # COMMIT_IMAGE: ghcr.io/checkmarble/marble-backend:${{ github.sha }}
-      COMMIT_IMAGE: ghcr.io/apognu/marble-backend:${{ github.sha }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Extract version from tag
-        id: version
-        run: echo "MARBLE_VERSION=$(git describe --tags)" >> "$GITHUB_OUTPUT"
-
-      - name: Authenticate to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Cache
-        uses: actions/cache@v6
-        id: cache
-        with:
-          path: docker-cache
-          key: marble-${{ github.job }}-${{ hashFiles('Dockerfile') }}
-          restore-keys: |
-            marble-${{ github.job }}
-            marble-
-
-      - name: Restore Docker cache mounts
-        uses: reproducible-containers/buildkit-cache-dance@v3
-        with:
-          builder: ${{ steps.setup-buildx.outputs.name }}
-          cache-dir: docker-cache
-          dockerfile: Dockerfile
-          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v7
-        with:
-          push: true
-          build-args: |
-            MARBLE_VERSION=${{ steps.version.outputs.MARBLE_VERSION }}
-            SEGMENT_WRITE_KEY=${{ secrets.segment_write_key_opensource }}
-          tags: ${{ env.COMMIT_IMAGE }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
   deploy:
-    needs: [docker]
     name: Deploy
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write # needed for using open id token to authenticate with GCP services
     env:
-      COMMIT_IMAGE: ghcr.io/checkmarble/marble-backend:${{ github.sha }}
+      COMMIT_IMAGE: ghcr.io/${{ github.repository_owner }}/marble-backend:${{ github.sha }}
       VERSION_IMAGE: europe-west1-docker.pkg.dev/marble-infra/marble/marble-backend:${{ inputs.version }}
     steps:
+      - name: Download image
+        uses: actions/download-artifact@v7
+        with:
+          name: marble-image
+          path: ${{ runner.temp }}
+
+      - name: Push image
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: |
+          echo "$GITHUB_TOKEN" | skopeo login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          skopeo copy "oci-archive:$RUNNER_TEMP/image.tar" "docker://$COMMIT_IMAGE"
+
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v3
         env:

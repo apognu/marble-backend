@@ -1,0 +1,47 @@
+name: Set up Go with cache
+description: Set up Go and restore the shared Go module and build caches (restore only, jobs save explicitly).
+
+inputs:
+  cache-prefix:
+    description: Cache key prefix, one per build environment (build cache entries only hit within the same toolchain and flags)
+    required: true
+  setup-go:
+    description: Whether to install Go (disable when running in a container that already ships it)
+    default: "true"
+
+outputs:
+  cache-key:
+    description: Key to use when saving the cache at the end of the job
+    value: ${{ steps.key.outputs.key }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      if: inputs.setup-go == 'true'
+      uses: actions/setup-go@v6
+      with:
+        go-version-file: ./go.mod
+        cache: false
+
+    - name: Pin Go cache locations
+      shell: bash
+      run: |
+        echo "GOCACHE=$HOME/.cache/go-build" >> "$GITHUB_ENV"
+        echo "GOMODCACHE=$HOME/go/pkg/mod" >> "$GITHUB_ENV"
+
+    - name: Compute cache key
+      id: key
+      shell: bash
+      run: echo "key=${{ inputs.cache-prefix }}-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+    - name: Restore Go cache
+      uses: actions/cache/restore@v6
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ steps.key.outputs.key }}
+        restore-keys: |
+          ${{ inputs.cache-prefix }}-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+          ${{ inputs.cache-prefix }}-${{ runner.os }}-

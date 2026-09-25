@@ -1,4 +1,4 @@
-name: Build and test back-end repo
+name: Test migration ordering
 
 on: workflow_call
 
@@ -33,35 +33,14 @@ jobs:
         with:
           ref: main
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: ./go.mod
-          cache: false
-
-      - uses: actions/cache/restore@v5
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-            ~/go/bin
-          key: marble-${{ github.job }}-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            marble-${{ github.job }}-
-            marble-
-
       - name: Install goose
-        run: |
-          if ! command -v goose &> /dev/null; then
-            go install github.com/pressly/goose/v3/cmd/goose@latest
-          fi
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+        run: curl -fsSL -o /tmp/goose https://github.com/pressly/goose/releases/download/v3.27.0/goose_linux_x86_64 && chmod +x /tmp/goose
 
       - name: Run migrations on main branch
         env:
           GOOSE_DRIVER: postgres
           GOOSE_DBSTRING: host=localhost port=5432 user=postgres password=postgres dbname=marble_test sslmode=disable
-        run: goose -dir repositories/migrations up
+        run: /tmp/goose -dir repositories/migrations up
 
       - name: Checkout PR branch
         uses: actions/checkout@v6
@@ -77,7 +56,7 @@ jobs:
           # Remove the compacted baseline migration - it's only for fresh installs,
           # not for testing migration ordering against main branch
           rm -f repositories/migrations/20241231000000_baseline_compacted.sql
-          goose -dir repositories/migrations up || {
+          /tmp/goose -dir repositories/migrations up || {
             echo "❌ Migration failed! This indicates migration ordering issues."
             echo "Check if your new migrations can run after main branch migrations."
             exit 1
