@@ -9,8 +9,6 @@ on:
 
 permissions:
   contents: write
-  id-token: write
-  attestations: write
 
 jobs:
   release:
@@ -27,7 +25,7 @@ jobs:
           draft: true
           prerelease: ${{ env.PRERELEASE == 'true' }}
 
-      - name: Publish prerelease
+      - name: Publish release
         uses: softprops/action-gh-release@v3
         with:
           name: ${{ inputs.tag }}

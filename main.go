@@ -1,7 +1,5 @@
 package main
 
-// OK
-
 import (
 	"flag"
 	"log"

@@ -21,10 +21,7 @@ RUN \
   --mount=type=cache,target=/go/pkg/mod \
   CGO_ENABLED=1 go build -o /go/bin/app -trimpath -ldflags="-extldflags=-s -w -X main.apiVersion=${MARBLE_VERSION} -X main.segmentWriteKey=${SEGMENT_WRITE_KEY}"
 
-FROM gcr.io/distroless/cc:latest
-
-COPY --from=build /go/bin/app /
-COPY --from=build /usr/local/go/lib/time/zoneinfo.zip /
+FROM gcr.io/distroless/cc-debian13 AS runtime
 
 ENV ZONEINFO=/zoneinfo.zip
 ENV PORT=8080
@@ -32,3 +29,14 @@ ENV PORT=8080
 EXPOSE $PORT
 
 ENTRYPOINT ["/app"]
+
+# Used by CI, from a context containing a binary and zoneinfo.zip built on the same distribution as the build stage.
+FROM runtime AS prebuilt
+
+COPY --chmod=755 app /
+COPY zoneinfo.zip /
+
+FROM runtime
+
+COPY --from=build /go/bin/app /
+COPY --from=build /usr/local/go/lib/time/zoneinfo.zip /
