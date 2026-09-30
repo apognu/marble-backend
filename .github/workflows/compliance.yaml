@@ -10,7 +10,7 @@ permissions:
 jobs:
   licensing:
     name: Check open source licenses
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v6
 

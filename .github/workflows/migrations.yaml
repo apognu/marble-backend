@@ -5,7 +5,7 @@ on: workflow_call
 jobs:
   migrations:
     name: Test migration ordering
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       pull-requests: read
