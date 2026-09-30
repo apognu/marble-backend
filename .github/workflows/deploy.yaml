@@ -23,8 +23,10 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write # needed for using open id token to authenticate with GCP services
+      id-token: write # needed for using open id token to authenticate with GCP services, and for attestations
+      attestations: write
     env:
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/marble-backend
       COMMIT_IMAGE: ghcr.io/${{ github.repository_owner }}/marble-backend:${{ github.sha }}
       VERSION_IMAGE: europe-west1-docker.pkg.dev/marble-infra/marble/marble-backend:${{ inputs.version }}
     steps:
@@ -34,13 +36,25 @@ jobs:
           name: marble-image
           path: ${{ runner.temp }}
 
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Push image
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_ACTOR: ${{ github.actor }}
+        id: push
         run: |
-          echo "$GITHUB_TOKEN" | skopeo login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-          skopeo copy "oci-archive:$RUNNER_TEMP/image.tar" "docker://$COMMIT_IMAGE"
+          skopeo copy --digestfile "$RUNNER_TEMP/image.digest" "oci-archive:$RUNNER_TEMP/image.tar" "docker://$COMMIT_IMAGE"
+          echo "digest=$(cat "$RUNNER_TEMP/image.digest")" >> "$GITHUB_OUTPUT"
+
+      - name: Attest image
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v3
@@ -100,3 +114,33 @@ jobs:
       #       --quiet \
       #       --image="$VERSION_IMAGE" \
       #       --region="europe-west1"
+
+  docs:
+    name: Publish API documentation
+    if: inputs.environment == 'production'
+    environment: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download OpenAPI specification artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: marble-api-openapi
+          path: /tmp/openapis
+
+      # - name: Publish Marble API OpenAPI
+      #   uses: readmeio/rdme@v10
+      #   env:
+      #     FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      #     README_API_KEY: ${{ secrets.README_API_KEY }}
+      #   with:
+      #     rdme: openapi upload --version=v1.0.0 --slug=marble-api /tmp/openapis/marble-api-v1.yml
+
+      # - name: Publish Marble API OpenAPI beta endpoints
+      #   uses: readmeio/rdme@v10
+      #   env:
+      #     FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      #     README_API_KEY: ${{ secrets.README_API_KEY }}
+      #   with:
+      #     rdme: openapi upload --version=v1.0.0 --slug=marble-api-beta /tmp/openapis/marble-api-v1beta.yml
